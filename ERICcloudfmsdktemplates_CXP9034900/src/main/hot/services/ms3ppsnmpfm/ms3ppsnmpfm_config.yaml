@@ -1,0 +1,37 @@
+#cloud-config
+merge_how: 'list(append)+dict(recurse_array,no_replace)+str()'
+write_files:
+  - path: /run/cloud-init/config.sh
+    owner: root:root
+    permissions: '0777'
+    content : |
+      #!/bin/bash
+      myhostname=$(uname -n | cut -d'.' -f1 )
+      hostname ${myhostname}
+      MS3SNAMPFM_INTERNAL_IP=_MS3SNAMPFM_INTERNAL_IP_
+      echo "${MS3SNAMPFM_INTERNAL_IP} ${myhostname}" >> /etc/hosts
+      service rsyslog restart
+      echo "HOSTNAME=${myhostname}" >> /etc/sysconfig/network
+      consul kv put enm/deployment/applications/customizations fmsnmp
+      if [ $? -eq 0 ]; then
+         echo "customizations fmsdk key added successfully"
+      else
+         echo "Failed to add customizations fmsdk key."
+      fi
+
+      #HTTPD Configuration
+      # Install JBoss package
+      yum install -y EXTRjboss_CXP9031339.noarch
+      yum install -y ERICgeneric3ppsnmptargetdesthandler_CXP1234571-1.0.0-1.noarch
+      yum install -y ERICnewnetypefmtransformation_CXP1234571-1.0.0-1.noarch
+      yum install -y ERICenmsgms3ppsnmpfm_CXP1234573-1.0.0-1.noarch
+
+      yum install -y ERICsimpleavailabilitymanageragents_CXP9034284.noarch
+      # increase timeout for jboss
+      echo -e "\nSTARTUP_WAIT=21600" >> /ericsson/3pp/jboss/jboss-as.conf
+
+      # workaround for jgroups bind when using single interface
+      my_ip=`getent hosts | /bin/grep -w $myhostname | /bin/awk '{print $1}'`
+      sed -i "s/jg_bind_address=\$DEFAULT_IP/jg_bind_address=${my_ip}/g" /ericsson/3pp/jboss/bin/standalone.conf
+runcmd:
+  - /run/cloud-init/config.sh

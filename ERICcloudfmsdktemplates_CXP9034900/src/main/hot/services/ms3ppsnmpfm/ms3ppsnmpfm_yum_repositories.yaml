@@ -1,0 +1,34 @@
+#cloud-config
+merge_how: 'list(append)+dict(recurse_array,no_replace)+str()'
+write_files:
+  - path: /run/cloud-init/customizations_yum_repositories.sh
+    owner: root:root
+    permissions: '0777'
+    content : |
+      #!/bin/bash
+
+      echo "[customizations]
+      gpgcheck = 0
+      enabled = 1
+      baseurl = http://repo/customizations/
+      name = ENM CUSTOMIZATION FMSDK Repository" > /etc/yum.repos.d/customizations.repo
+
+      # Check does the customaztion repo directory exist if so continue else wait
+      for repo in customizations
+      do
+        while true
+        do
+            yum repolist|grep ${repo} >/dev/null 2>&1
+            if [ $? -eq 0 ] ;then
+                echo "${repo} REPO exists continuing the deployment..."
+                break
+             else
+                echo "Waiting for ${repo} Repo to exist"
+                sleep 2
+             fi
+        done
+       done
+
+
+runcmd:
+  - /run/cloud-init/customizations_yum_repositories.sh

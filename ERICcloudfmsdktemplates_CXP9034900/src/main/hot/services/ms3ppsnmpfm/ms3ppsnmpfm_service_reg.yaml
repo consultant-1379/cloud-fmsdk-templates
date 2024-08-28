@@ -1,0 +1,25 @@
+#cloud-config
+merge_how: 'list(append)+dict(recurse_array,no_replace)+str()'
+write_files:
+  - path: /etc/consul.d/agent/service_ms3ppsnmpfm.json
+    owner: root:root
+    permissions: '0644'
+    content : |
+      {
+        "services": [
+          {
+            "name": "ms3ppsnmpfm",
+            "enableTagOverride": false,
+            "address": "%%_ETH0_%%"
+          }
+        ]
+      }
+
+  - path: /run/cloud-init/service_ms3ppsnmpfm.sh
+    owner: root:root
+    permissions: '0777'
+    content : |
+      #!/bin/bash
+      echo $(ip addr show eth0 | grep -w inet | awk '{print $2}' | cut -d / -f 1) | (sed -i.bak 's/%%_ETH0_%%/'$(xargs)'/g' /etc/consul.d/agent/service_ms3ppsnmpfm.json)
+runcmd:
+  - /run/cloud-init/service_ms3ppsnmpfm.sh

@@ -1,0 +1,150 @@
+heat_template_version: 2016-04-08
+
+description: ms3ppsnmpfm template
+
+parameters:
+  enm_rhel6_base_image_name:
+    type: string
+
+  enm_internal_network_name:
+    type: string
+
+  enm_security_group_name:
+    type: comma_delimited_list
+
+  flavor_4vC8M:
+    type: string
+
+  key_name:
+    type: string
+
+  use_config_drive:
+    type: boolean
+    default: true
+
+  internal_netmask:
+    type: string
+
+  lvs_fcaps_option_FM:
+    type: string
+
+  service_registry_dns_port:
+    type: string
+    default: 53
+
+  service_registry_datacenter:
+    type: string
+    default: dc1
+
+  service_registry_domain:
+    type: string
+    default: enm
+
+  serviceregistry_internal_ip_list:
+    type: comma_delimited_list
+
+  timezone:
+    type: string
+
+  enm_external_network_name:
+    type: string
+
+  provider_routed_network_name:
+    type: string
+
+  NodeIndex:
+    type: string
+
+  deployment_id:
+    type: string
+
+  service_name:
+    type: string
+    default: ms3ppsnmpfm
+
+  ms3ppsnmpfm_internal_ip_list:
+    type: comma_delimited_list
+
+  ms3ppsnmpfm_internal_ipv6_list:
+    type: comma_delimited_list
+    default: ''
+
+  ms3ppsnmpfm_external_ipv6_list:
+    type: comma_delimited_list
+    default: ''
+
+resources:
+  vm:
+    type: ms3ppsnmpfm_vm.yaml
+    properties:
+      NodeIndex: { get_param: NodeIndex }
+      service_name: { get_param: service_name }
+      deployment_id: { get_param: deployment_id }
+      ms3ppsnmpfm_internal_ip_list: { get_param: ms3ppsnmpfm_internal_ip_list }
+      enm_rhel6_base_image_name: { get_param: enm_rhel6_base_image_name }
+      flavor: { get_param: flavor_4vC8M }
+      use_config_drive: { get_param: use_config_drive }
+      key_name: { get_param: key_name }
+      user_data: { get_resource: user_data }
+      enm_internal_network_name: { get_param: enm_internal_network_name }
+      enm_security_group_name: { get_param: enm_security_group_name }
+      provider_routed_network_name: { get_param: provider_routed_network_name }
+      enm_external_network_name: { get_param: enm_external_network_name }
+
+  user_data:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+      - config:
+          str_replace:
+            params:
+              _SERVICE_REGISTRY_DATACENTER_: { get_param: service_registry_datacenter }
+              _SERVICE_REGISTRY_DOMAIN_: { get_param: service_registry_domain }
+            template: { get_file: ../../../services/common_resources/enm_resolv_conf.yaml }
+      - config:
+          str_replace:
+            params:
+              _TIMEZONE_: { get_param: timezone }
+            template: { get_file: ../../../services/common_resources/enm_timezone_conf.yaml }
+      - config: { get_file: ../../../services/common_resources/enm_ntp_client_conf.yaml }
+      - config: { get_file: ../../../services/common_resources/cloud_init_timer.yaml }
+      - config: { get_file: ../../../services/common_resources/plumb_ethernet_interfaces.yaml }
+      - config:
+          str_replace:
+           params:
+             _INTERFACE_: 'eth0'
+             _ADDRESS_: {get_param: [ ms3ppsnmpfm_internal_ip_list, {get_param: NodeIndex} ] }
+             _NETMASK_: { get_param: internal_netmask }
+             _GATEWAY_: { get_param: lvs_fcaps_option_FM }
+             _ADDRESSIPV6_: {get_param: [ ms3ppsnmpfm_internal_ipv6_list, {get_param: NodeIndex} ] }
+             _GATEWAYIPV6_: ''
+           template:  { get_file: ../../../services/common_resources/plumb_ip_address.yaml }
+      - config: { get_file: ../../../services/ms3ppsnmpfm/ms3ppsnmpfm_service_reg.yaml }
+      - config:
+          str_replace:
+            params:
+              _DNS_PORT_: { get_param: service_registry_dns_port}
+              _SERVICE_REGISTRY_1_IP_: {get_param: [serviceregistry_internal_ip_list, 0]}
+              _SERVICE_REGISTRY_2_IP_: {get_param: [serviceregistry_internal_ip_list, 1]}
+              _SERVICE_REGISTRY_3_IP_: {get_param: [serviceregistry_internal_ip_list, 2]}
+              _SERVICE_REGISTRY_4_IP_: {get_param: [serviceregistry_internal_ip_list, 3]}
+              _SERVICE_REGISTRY_5_IP_: {get_param: [serviceregistry_internal_ip_list, 4]}
+              _NAMESERVER_A_ : ''
+              _NAMESERVER_B_ : ''
+              _SERVICE_REGISTRY_DATACENTER_: { get_param: service_registry_datacenter }
+              _SERVICE_REGISTRY_DOMAIN_: { get_param: service_registry_domain }
+            template: { get_file: ../../../services/common_resources/service_registry_agent.yaml }
+      - config: { get_file: ../../../services/common_resources/wait_for_config_store.yaml }
+      - config: { get_file: ../../../services/common_resources/enm_host_details.yaml }
+      - config: { get_file: ../../../services/common_resources/enm_yum_repositories.yaml }
+      - config: { get_file: ../../../services/common_resources/wait_for_enm_repos.yaml }
+      - config: { get_file: ../../../services/common_resources/wait_for_nfs_vms.yaml }
+      - config: { get_file: ../../../services/ms3ppsnmpfm/ms3ppsnmpfm_mounts.yaml }
+      - config: { get_file: ../../../services/ms3ppsnmpfm/ms3ppsnmpfm_yum_repositories.yaml }
+      - config: { get_file: ../../../services/common_resources/user_permissions.yaml }
+      - config:
+          str_replace:
+            params:
+              _MS3SNAMPFM_INTERNAL_IP_: {get_param: [ ms3ppsnmpfm_internal_ip_list, {get_param: NodeIndex} ] }
+            template: { get_file: ../../../services/ms3ppsnmpfm/ms3ppsnmpfm_config.yaml }
+

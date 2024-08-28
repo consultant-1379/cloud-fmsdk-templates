@@ -1,0 +1,24 @@
+#cloud-config
+merge_how: 'list(append)+dict(recurse_array,no_replace)+str()'
+write_files:
+  - path: /run/cloud-init/mounts.sh
+    owner: root:root
+    permissions: '0777'
+    content : |
+      #!/bin/bash
+      mkdir -p /var/ericsson/ddc_data
+      mkdir -p /ericsson/tor/data
+      mkdir -p /home/shared
+      mkdir -p /ericsson/enm/dumps
+      mkdir -p /etc/opt/ericsson/ERICmodeldeployment
+      mkdir -p /ericsson/vmcrons
+      echo "nfscron:/ericsson/cron   /ericsson/vmcrons   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      echo "nfsmdt:/ericsson/mdt   /etc/opt/ericsson/ERICmodeldeployment   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      echo "nfsddcdata:/ericsson/ddc_data   /var/ericsson/ddc_data   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      echo "nfsdata:/ericsson/data   /ericsson/tor/data   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      echo "nfshome:/ericsson/home   /home/shared   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      echo "nfshcdumps:/ericsson/hcdumps   /ericsson/enm/dumps   nfs soft,defaults,_netdev 1 2 " >> /etc/fstab
+      mount -a
+
+runcmd:
+  - /run/cloud-init/mounts.sh
